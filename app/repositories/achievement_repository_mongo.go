@@ -2,11 +2,20 @@ package repositories
 
 import (
 	"context"
+	"time"
 
-	"UAS-Backend/app/models"
+	"github.com/bomboskuy/UAS-Backend/app/models"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+type AchievementRepository interface {
+	Create(achievement *models.Achievement) (string, error)
+	FindByID(id string) (*models.Achievement, error)
+	Update(id string, achievement *models.Achievement) error
+	SoftDelete(id string) error
+}
 
 type achievementRepositoryMongo struct {
 	collection *mongo.Collection
@@ -18,16 +27,33 @@ func NewAchievementRepositoryMongo(db *mongo.Database) AchievementRepository {
 	}
 }
 
-func (r *achievementRepositoryMongo) Create(a *models.Achievement) error {
+func (r *achievementRepositoryMongo) Create(a *models.Achievement) (string, error) {
+	a.ID = primitive.NewObjectID()
+	a.CreatedAt = time.Now()
+	a.UpdatedAt = time.Now()
+
 	_, err := r.collection.InsertOne(context.Background(), a)
-	return err
+	if err != nil {
+		return "", err
+	}
+
+	return a.ID.Hex(), nil
 }
 
+
 func (r *achievementRepositoryMongo) FindByID(id string) (*models.Achievement, error) {
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+
 	var achievement models.Achievement
-	err := r.collection.FindOne(
+	err = r.collection.FindOne(
 		context.Background(),
-		bson.M{"_id": id},
+		bson.M{
+			"_id":       objID,
+			"deletedAt": bson.M{"$exists": false},
+		},
 	).Decode(&achievement)
 
 	if err != nil {
@@ -37,37 +63,34 @@ func (r *achievementRepositoryMongo) FindByID(id string) (*models.Achievement, e
 	return &achievement, nil
 }
 
-func (r *achievementRepositoryMongo) FindByStudentID(studentID string) ([]models.Achievement, error) {
-	cursor, err := r.collection.Find(
-		context.Background(),
-		bson.M{"studentId": studentID},
-	)
+func (r *achievementRepositoryMongo) Update(id string, achievement *models.Achievement) error {
+	objID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(context.Background())
-
-	var achievements []models.Achievement
-	if err := cursor.All(context.Background(), &achievements); err != nil {
-		return nil, err
+		return err
 	}
 
-	return achievements, nil
-}
+	achievement.UpdatedAt = time.Now()
 
-func (r *achievementRepositoryMongo) UpdateStatus(id string, status string) error {
-	_, err := r.collection.UpdateOne(
+	_, err = r.collection.UpdateOne(
 		context.Background(),
-		bson.M{"_id": id},
-		bson.M{"$set": bson.M{"status": status}},
+		bson.M{"_id": objID},
+		bson.M{"$set": achievement},
 	)
+
 	return err
 }
 
-func (r *achievementRepositoryMongo) Delete(id string) error {
-	_, err := r.collection.DeleteOne(
+func (r *achievementRepositoryMongo) SoftDelete(id string) error {
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.collection.UpdateOne(
 		context.Background(),
-		bson.M{"_id": id},
+		bson.M{"_id": objID},
+		bson.M{"$set": bson.M{"deletedAt": time.Now()}},
 	)
+
 	return err
 }

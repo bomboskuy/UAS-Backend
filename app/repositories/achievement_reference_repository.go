@@ -1,6 +1,6 @@
 package repositories
 
-import "UAS-Backend/app/models"
+import "github.com/bomboskuy/UAS-Backend/app/models"
 
 type AchievementReferenceRepository interface {
 	Create(ref *models.AchievementReference) error

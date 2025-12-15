@@ -1,9 +1,12 @@
 package models
 
-import "time"
+import (
+	"time"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 type Achievement struct {
-	ID              string        `bson:"_id,omitempty" json:"id"`
+	ID              primitive.ObjectID        `bson:"_id,omitempty" json:"id"`
 	StudentID       string        `bson:"studentId" json:"student_id"`
 	AchievementType string        `bson:"achievementType" json:"achievement_type"`
 	Title           string        `bson:"title" json:"title"`
