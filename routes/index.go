@@ -58,31 +58,4 @@ func Register(app *fiber.App) {
 		return helper.Success(c, "Logout berhasil", nil)
 	})
 }
-```
 
-### Testing Postman FR-001
-```
-POST http://localhost:8080/api/v1/auth/login
-Content-Type: application/json
-
-{
-  "username": "admin",
-  "password": "password123"
-}
-
-Response:
-{
-  "status": "success",
-  "message": "Login berhasil",
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
-    "user": {
-      "id": "uuid",
-      "username": "admin",
-      "full_name": "Admin User",
-      "role": "Admin",
-      "permissions": ["achievement:create", ...]
-    }
-  }
-}
