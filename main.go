@@ -5,30 +5,31 @@ import (
 	"log"
 
 	"github.com/bomboskuy/UAS-Backend/db"
+	"github.com/bomboskuy/UAS-Backend/routes"
 	"github.com/bomboskuy/UAS-Backend/utils"
-    "github.com/bomboskuy/UAS-Backend/routes"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
-    "github.com/gofiber/fiber/v2"
-
 )
+
 func main() {
-    if err := godotenv.Load(); err != nil {
+	if err := godotenv.Load(); err != nil {
 		log.Fatal("Failed load env")
 	}
 
 	db.ConnectPostgres()
+	db.ConnectMongoDB()
 
-    utils.InitLogger()
-    fmt.Println("Go Clean Architecture Started 🚀")
+	utils.InitLogger()
+	fmt.Println("🚀 UAS Backend Started")
 
-    app := fiber.New(fiber.Config{
+	app := fiber.New(fiber.Config{
 		AppName: "UAS Backend",
 	})
 
-	// Register routes
+	app.Use(cors.New())
+
 	routes.Register(app)
 
-	// Run server
 	log.Fatal(app.Listen(":8080"))
-
 }

@@ -3,8 +3,8 @@ package middleware
 import (
 	"strings"
 
-	"github.com/bomboskuy/UAS-Backend/utils"
 	"github.com/bomboskuy/UAS-Backend/helper"
+	"github.com/bomboskuy/UAS-Backend/utils"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -23,10 +23,32 @@ func AuthRequired() fiber.Handler {
 			return helper.Unauthorized(c, "Token tidak valid atau expired")
 		}
 
-		// simpan ke context
 		c.Locals("user_id", claims.UserID)
 		c.Locals("role_id", claims.RoleID)
 		c.Locals("permissions", claims.Permissions)
+
+		return c.Next()
+	}
+}
+
+func RequirePermission(permission string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		permissions, ok := c.Locals("permissions").([]string)
+		if !ok {
+			return helper.Forbidden(c, "Permission data not found")
+		}
+
+		hasPermission := false
+		for _, p := range permissions {
+			if p == permission {
+				hasPermission = true
+				break
+			}
+		}
+
+		if !hasPermission {
+			return helper.Forbidden(c, "Anda tidak memiliki akses untuk resource ini")
+		}
 
 		return c.Next()
 	}
