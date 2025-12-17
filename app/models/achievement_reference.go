@@ -4,6 +4,7 @@ import "time"
 
 type AchievementReference struct {
 	ID                 string     `db:"id" json:"id"`
+	UserID             string     `db:"user_id" json:"user_id"`
 	StudentID          string     `db:"student_id" json:"student_id"`
 	MongoAchievementID string     `db:"mongo_achievement_id" json:"mongo_achievement_id"`
 	Status             string     `db:"status" json:"status"`
