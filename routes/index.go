@@ -1,61 +1,117 @@
 package routes
 
 import (
-	"database/sql"
-
-	"github.com/bomboskuy/UAS-Backend/app/repositories"
-	"github.com/bomboskuy/UAS-Backend/app/services"
-	"github.com/bomboskuy/UAS-Backend/db"
-	"github.com/bomboskuy/UAS-Backend/helper"
-	"github.com/bomboskuy/UAS-Backend/middleware"
 	"github.com/gofiber/fiber/v2"
+
+	"github.com/bomboskuy/UAS-Backend/app/services"
+	"github.com/bomboskuy/UAS-Backend/middleware"
 )
 
-func Register(app *fiber.App) {
-	// Initialize repositories
-	userRepo := repositories.NewUserRepositoryPg(db.DB)
-	roleRepo := repositories.NewRoleRepositoryPg(db.DB)
-	permissionRepo := repositories.NewPermissionRepositoryPg(db.DB)
-
-	// Initialize services
-	authService := services.NewAuthService(userRepo, roleRepo, permissionRepo)
-
+func Register(
+	app *fiber.App,
+	authService *services.AuthService,
+	userService *services.UserService,
+	achievementService *services.AchievementService,
+) {
 	api := app.Group("/api/v1")
 
-	// Auth routes
+	// =====================
+	// AUTH
+	// =====================
 	auth := api.Group("/auth")
-	auth.Post("/login", func(c *fiber.Ctx) error {
-		var req services.LoginRequest
-		if err := c.BodyParser(&req); err != nil {
-			return helper.BadRequest(c, "Invalid request body", nil)
-		}
+	auth.Post("/login", authService.Login)
+	auth.Get("/profile", middleware.AuthRequired(), authService.Profile)
+	auth.Post("/logout", middleware.AuthRequired(), authService.Logout)
 
-		result, err := authService.Login(req)
-		if err == sql.ErrNoRows {
-			return helper.Unauthorized(c, "Username atau password salah")
-		}
-		if err != nil {
-			return helper.InternalServerError(c, "Login failed")
-		}
+	// =====================
+	// USERS (ADMIN)
+	// =====================
+	users := api.Group("/users",
+		middleware.AuthRequired(),
+		middleware.RequirePermission("user:manage"),
+	)
 
-		return helper.Success(c, "Login berhasil", result)
-	})
+	users.Get("/", userService.GetAll)
+	users.Get("/:id", userService.GetByID)
+	users.Post("/", userService.Create)
+	users.Put("/:id", userService.Update)
+	users.Delete("/:id", userService.Delete)
 
-	auth.Get("/profile", middleware.AuthRequired(), func(c *fiber.Ctx) error {
-		userID := c.Locals("user_id").(string)
-		roleID := c.Locals("role_id").(string)
-		permissions := c.Locals("permissions").([]string)
+	// =====================
+	// ACHIEVEMENTS
+	// =====================
+	achievements := api.Group("/achievements",
+		middleware.AuthRequired(),
+	)
 
-		profile, err := authService.GetProfile(userID, roleID, permissions)
-		if err != nil {
-			return helper.NotFound(c, "User not found")
-		}
+	achievements.Post("/",
+		middleware.RequirePermission("achievement:create"),
+		achievementService.Create,
+	)
 
-		return helper.Success(c, "Profile retrieved", profile)
-	})
+	achievements.Get("/",
+		middleware.RequirePermission("achievement:read"),
+		achievementService.GetAll,
+	)
 
-	auth.Post("/logout", middleware.AuthRequired(), func(c *fiber.Ctx) error {
-		return helper.Success(c, "Logout berhasil", nil)
-	})
+	achievements.Post("/:id/submit",
+		middleware.RequirePermission("achievement:update"),
+		achievementService.Submit,
+	)
+
+	achievements.Post("/:id/verify",
+		middleware.RequirePermission("achievement:verify"),
+		achievementService.Verify,
+	)
+
+	achievements.Post("/:id/reject",
+		middleware.RequirePermission("achievement:verify"),
+		achievementService.Reject,
+	)
+
+	// =====================
+	// STUDENTS
+	// =====================
+	students := api.Group("/students",
+		middleware.AuthRequired(),
+		middleware.RequirePermission("user:manage"),
+	)
+
+	students.Get("/", userService.GetStudents)
+	students.Get("/:id", userService.GetStudentByID)
+	students.Put("/:id/advisor", userService.AssignAdvisor)
+
+	// =====================
+	// LECTURERS
+	// =====================
+	lecturers := api.Group("/lecturers",
+		middleware.AuthRequired(),
+	)
+
+	lecturers.Get("/",
+		middleware.RequirePermission("user:manage"),
+		userService.GetLecturers,
+	)
+
+	lecturers.Get("/:id/advisees",
+		middleware.RequirePermission("achievement:verify"),
+		userService.GetAdvisees,
+	)
+
+	// =====================
+	// REPORTS
+	// =====================
+	reports := api.Group("/reports",
+		middleware.AuthRequired(),
+	)
+
+	reports.Get("/statistics",
+		middleware.RequirePermission("achievement:read"),
+		achievementService.Statistics,
+	)
+
+	reports.Get("/student/:id",
+		middleware.RequirePermission("achievement:read"),
+		achievementService.StudentReport,
+	)
 }
-

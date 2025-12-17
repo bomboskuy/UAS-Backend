@@ -6,6 +6,11 @@ import (
 	"github.com/bomboskuy/UAS-Backend/app/models"
 )
 
+type RoleRepository interface {
+	FindByID(id string) (*models.Role, error)
+	FindByName(name string) (*models.Role, error)
+}
+
 type roleRepositoryPg struct {
 	db *sql.DB
 }

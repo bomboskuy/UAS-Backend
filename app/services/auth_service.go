@@ -1,9 +1,11 @@
 package services
 
 import (
-	"database/sql"
+	"github.com/gofiber/fiber/v2"
 
+	"github.com/bomboskuy/UAS-Backend/app/models"
 	"github.com/bomboskuy/UAS-Backend/app/repositories"
+	"github.com/bomboskuy/UAS-Backend/helper"
 	"github.com/bomboskuy/UAS-Backend/utils"
 )
 
@@ -25,89 +27,95 @@ func NewAuthService(
 	}
 }
 
-type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
+//
+// ==========================
+// LOGIN
+// ==========================
+//
+func (s *AuthService) Login(c *fiber.Ctx) error {
+	var req models.LoginRequest
+	if err := c.BodyParser(&req); err != nil {
+		return helper.BadRequest(c, "Invalid request body", nil)
+	}
 
-type LoginResponse struct {
-	Token        string      `json:"token"`
-	RefreshToken string      `json:"refresh_token"`
-	User         UserProfile `json:"user"`
-}
-
-type UserProfile struct {
-	ID          string   `json:"id"`
-	Username    string   `json:"username"`
-	FullName    string   `json:"full_name"`
-	Role        string   `json:"role"`
-	Permissions []string `json:"permissions"`
-}
-
-func (s *AuthService) Login(req LoginRequest) (*LoginResponse, error) {
 	if req.Username == "" || req.Password == "" {
-		return nil, sql.ErrNoRows
+		return helper.Unauthorized(c, "Username atau password salah")
 	}
 
 	user, err := s.userRepo.FindByUsernameOrEmail(req.Username)
-	if err != nil {
-		return nil, err
-	}
-
-	if !user.IsActive {
-		return nil, sql.ErrNoRows
+	if err != nil || !user.IsActive {
+		return helper.Unauthorized(c, "Username atau password salah")
 	}
 
 	if !utils.CheckPassword(req.Password, user.PasswordHash) {
-		return nil, sql.ErrNoRows
+		return helper.Unauthorized(c, "Username atau password salah")
 	}
 
 	role, err := s.roleRepo.FindByID(user.RoleID)
 	if err != nil {
-		return nil, err
+		return helper.InternalServerError(c, "Failed to get role")
 	}
 
 	permissions, _ := s.permissionRepo.FindByRoleID(user.RoleID)
 
 	token, err := utils.GenerateToken(user.ID, user.RoleID, permissions)
 	if err != nil {
-		return nil, err
+		return helper.InternalServerError(c, "Failed to generate token")
 	}
 
 	refreshToken, err := utils.GenerateRefreshToken(user.ID)
 	if err != nil {
-		return nil, err
+		return helper.InternalServerError(c, "Failed to generate refresh token")
 	}
 
-	return &LoginResponse{
+	return helper.Success(c, "Login berhasil", models.LoginResponse{
 		Token:        token,
 		RefreshToken: refreshToken,
-		User: UserProfile{
+		User: models.UserProfile{
 			ID:          user.ID,
 			Username:    user.Username,
 			FullName:    user.FullName,
 			Role:        role.Name,
 			Permissions: permissions,
 		},
-	}, nil
+	})
 }
 
-func (s *AuthService) GetProfile(userID, roleID string, permissions []string) (*UserProfile, error) {
+//
+// ==========================
+// PROFILE
+// ==========================
+//
+func (s *AuthService) Profile(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	roleID := c.Locals("role_id").(string)
+	permissions := c.Locals("permissions").([]string)
+
 	user, err := s.userRepo.FindByID(userID)
 	if err != nil {
-		return nil, err
+		return helper.NotFound(c, "User not found")
 	}
 
 	role, err := s.roleRepo.FindByID(roleID)
 	if err != nil {
-		return nil, err
+		return helper.InternalServerError(c, "Role not found")
 	}
 
-	return &UserProfile{
+	return helper.Success(c, "Profile retrieved", models.UserProfile{
 		ID:          user.ID,
 		Username:    user.Username,
 		FullName:    user.FullName,
 		Role:        role.Name,
 		Permissions: permissions,
-	}, nil
+	})
+}
+
+//
+// ==========================
+// LOGOUT
+// ==========================
+//
+func (s *AuthService) Logout(c *fiber.Ctx) error {
+	// Stateless JWT → logout cukup di client
+	return helper.Success(c, "Logout berhasil", nil)
 }

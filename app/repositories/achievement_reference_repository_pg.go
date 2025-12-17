@@ -7,6 +7,17 @@ import (
 	"github.com/bomboskuy/UAS-Backend/app/models"
 )
 
+type AchievementReferenceRepository interface {
+	Create(ref *models.AchievementReference) error
+	FindByID(id string) (*models.AchievementReference, error)
+	FindByStudentID(studentID string) ([]models.AchievementReference, error)
+	FindByAdvisorID(lecturerID string) ([]models.AchievementReference, error)
+	FindVerifiedByStudentID(studentID string) ([]models.AchievementReference, error)
+	UpdateStatus(id string, status string, verifierID *string, note *string) error
+	FindAll() ([]models.AchievementReference, error)
+}
+
+
 type achievementReferenceRepositoryPg struct {
 	db *sql.DB
 }
@@ -139,6 +150,45 @@ func (r *achievementReferenceRepositoryPg) FindAll() ([]models.AchievementRefere
 		rows.Scan(&ref.ID, &ref.StudentID, &ref.MongoAchievementID, &ref.Status,
 			&ref.SubmittedAt, &ref.VerifiedAt, &ref.VerifiedBy, &ref.RejectionNote,
 			&ref.CreatedAt, &ref.UpdatedAt)
+		refs = append(refs, ref)
+	}
+
+	return refs, nil
+}
+
+func (r *achievementReferenceRepositoryPg) FindVerifiedByStudentID(studentID string) ([]models.AchievementReference, error) {
+	query := `
+		SELECT id, student_id, mongo_achievement_id, status,
+		       submitted_at, verified_at, verified_by,
+		       rejection_note, created_at, updated_at
+		FROM achievement_references
+		WHERE student_id = $1 AND status = 'verified'
+		ORDER BY verified_at DESC
+	`
+
+	rows, err := r.db.Query(query, studentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var refs []models.AchievementReference
+	for rows.Next() {
+		var ref models.AchievementReference
+		if err := rows.Scan(
+			&ref.ID,
+			&ref.StudentID,
+			&ref.MongoAchievementID,
+			&ref.Status,
+			&ref.SubmittedAt,
+			&ref.VerifiedAt,
+			&ref.VerifiedBy,
+			&ref.RejectionNote,
+			&ref.CreatedAt,
+			&ref.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
 		refs = append(refs, ref)
 	}
 

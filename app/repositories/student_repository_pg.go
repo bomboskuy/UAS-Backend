@@ -6,47 +6,131 @@ import (
 	"github.com/bomboskuy/UAS-Backend/app/models"
 )
 
-type studentRepositoryPg struct {
+type StudentRepository interface {
+	Create(student *models.Student) error
+	FindAll() ([]models.Student, error)
+	FindByID(id string) (*models.Student, error)
+	FindByUserID(userID string) (*models.Student, error)
+	AssignAdvisor(studentID string, advisorID string) error
+}
+
+type StudentRepositoryPg struct {
 	db *sql.DB
 }
 
 func NewStudentRepositoryPg(db *sql.DB) StudentRepository {
-	return &studentRepositoryPg{db: db}
+	return &StudentRepositoryPg{db: db}
 }
 
-func (r *studentRepositoryPg) Create(student *models.Student) error {
+func (r *StudentRepositoryPg) Create(student *models.Student) error {
 	query := `
-		INSERT INTO students (id, user_id, student_id, program_study, academic_year, advisor_id, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO students (
+			id, user_id, student_id, program_study,
+			academic_year, advisor_id, created_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7)
 	`
-	_, err := r.db.Exec(query, student.ID, student.UserID, student.StudentID, student.ProgramStudy, student.AcademicYear, student.AdvisorID, student.CreatedAt)
+	_, err := r.db.Exec(
+		query,
+		student.ID,
+		student.UserID,
+		student.StudentID,
+		student.ProgramStudy,
+		student.AcademicYear,
+		student.AdvisorID,
+		student.CreatedAt,
+	)
 	return err
 }
 
-func (r *studentRepositoryPg) FindByUserID(userID string) (*models.Student, error) {
-	var student models.Student
-	query := `SELECT id, user_id, student_id, program_study, academic_year, advisor_id, created_at FROM students WHERE user_id=$1`
-	err := r.db.QueryRow(query, userID).Scan(&student.ID, &student.UserID, &student.StudentID, &student.ProgramStudy, &student.AcademicYear, &student.AdvisorID, &student.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &student, nil
-}
+func (r *StudentRepositoryPg) FindAll() ([]models.Student, error) {
+	query := `
+		SELECT id, user_id, student_id, program_study,
+		       academic_year, advisor_id, created_at
+		FROM students
+	`
 
-func (r *studentRepositoryPg) FindByAdvisorID(lecturerID string) ([]models.Student, error) {
-	query := `SELECT id, user_id, student_id, program_study, academic_year, advisor_id, created_at FROM students WHERE advisor_id=$1`
-	rows, err := r.db.Query(query, lecturerID)
+	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	students := []models.Student{}
+	var students []models.Student
 	for rows.Next() {
 		var s models.Student
-		rows.Scan(&s.ID, &s.UserID, &s.StudentID, &s.ProgramStudy, &s.AcademicYear, &s.AdvisorID, &s.CreatedAt)
+		if err := rows.Scan(
+			&s.ID,
+			&s.UserID,
+			&s.StudentID,
+			&s.ProgramStudy,
+			&s.AcademicYear,
+			&s.AdvisorID,
+			&s.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
 		students = append(students, s)
 	}
 
 	return students, nil
+}
+
+func (r *StudentRepositoryPg) FindByID(id string) (*models.Student, error) {
+	query := `
+		SELECT id, user_id, student_id, program_study,
+		       academic_year, advisor_id, created_at
+		FROM students
+		WHERE id = $1
+	`
+
+	var s models.Student
+	err := r.db.QueryRow(query, id).Scan(
+		&s.ID,
+		&s.UserID,
+		&s.StudentID,
+		&s.ProgramStudy,
+		&s.AcademicYear,
+		&s.AdvisorID,
+		&s.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &s, nil
+}
+
+func (r *StudentRepositoryPg) FindByUserID(userID string) (*models.Student, error) {
+	query := `
+		SELECT id, user_id, student_id, program_study,
+		       academic_year, advisor_id, created_at
+		FROM students
+		WHERE user_id = $1
+	`
+
+	var s models.Student
+	err := r.db.QueryRow(query, userID).Scan(
+		&s.ID,
+		&s.UserID,
+		&s.StudentID,
+		&s.ProgramStudy,
+		&s.AcademicYear,
+		&s.AdvisorID,
+		&s.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &s, nil
+}
+
+func (r *StudentRepositoryPg) AssignAdvisor(studentID string, advisorID string) error {
+	query := `
+		UPDATE students
+		SET advisor_id = $1
+		WHERE id = $2
+	`
+	_, err := r.db.Exec(query, advisorID, studentID)
+	return err
 }

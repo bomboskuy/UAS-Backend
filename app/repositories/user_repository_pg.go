@@ -125,3 +125,4 @@ func (r *userRepositoryPg) Delete(id string) error {
 	_, err := r.db.Exec(`DELETE FROM users WHERE id=$1`, id)
 	return err
 }
+
