@@ -64,7 +64,6 @@ func (s *AchievementService) Create(c *fiber.Ctx) error {
 
 	ref := &models.AchievementReference{
 		ID:                 uuid.New().String(),
-		UserID:             userID,
 		StudentID:          student.ID,
 		MongoAchievementID: mongoID,
 		Status:             "draft",
@@ -202,17 +201,14 @@ func (s *AchievementService) Reject(c *fiber.Ctx) error {
 
 // Statistik achievement (ADMIN / DOSEN)
 func (s *AchievementService) Statistics(c *fiber.Ctx) error {
-	// TODO: implementasi real (count by status, dsb)
-
-	data := map[string]int{
-		"draft":     0,
-		"submitted": 0,
-		"verified":  0,
-		"rejected":  0,
+	data, err := s.achievementReferenceRepo.CountByStatus()
+	if err != nil {
+		return helper.InternalServerError(c, "Gagal mengambil statistik achievement")
 	}
 
 	return helper.Success(c, "OK", data)
 }
+
 
 // Laporan achievement per mahasiswa
 func (s *AchievementService) StudentReport(c *fiber.Ctx) error {
